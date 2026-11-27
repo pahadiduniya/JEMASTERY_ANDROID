@@ -22,6 +22,14 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material3.CircularProgressIndicator
+import com.jemastery.app.data.LeaderEntry
+import com.jemastery.app.data.Repo
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -269,5 +277,98 @@ private fun PlanCard(name: String, price: String, popular: Boolean, modifier: Mo
             Spacer(Modifier.height(3.dp))
             Text("POPULAR", fontSize = 8.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD97706))
         }
+    }
+}
+
+
+@Composable
+fun LeaderboardSheet(quiz: Quiz, onDismiss: () -> Unit) {
+    var loading by remember { mutableStateOf(true) }
+    var entries by remember { mutableStateOf<List<LeaderEntry>>(emptyList()) }
+
+    LaunchedEffect(quiz.id) {
+        entries = runCatching { Repo.loadLeaderboard(quiz.id) }.getOrDefault(emptyList())
+        loading = false
+    }
+
+    BottomSheet(onDismiss = onDismiss) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("\uD83C\uDFC6 Leaderboard", fontSize = 20.sp, fontWeight = FontWeight.Black)
+            Spacer(Modifier.weight(1f))
+            Text("\u2716", fontSize = 18.sp, modifier = Modifier.clickable { onDismiss() })
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            quiz.title,
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2
+        )
+        Spacer(Modifier.height(14.dp))
+
+        if (loading) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 30.dp),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
+        } else if (entries.isEmpty()) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 30.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "No attempts yet. Be the first! \uD83D\uDE80",
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .height(320.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                entries.take(10).forEachIndexed { idx, e ->
+                    val medal = when (idx) {
+                        0 -> "\uD83E\uDD47"
+                        1 -> "\uD83E\uDD48"
+                        2 -> "\uD83E\uDD49"
+                        else -> (idx + 1).toString()
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (e.isMe) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                            )
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(medal, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.size(10.dp))
+                        Text(
+                            e.name + (if (e.isMe) " (you)" else ""),
+                            fontSize = 13.sp,
+                            fontWeight = if (e.isMe) FontWeight.Bold else FontWeight.Normal,
+                            modifier = Modifier.weight(1f)
+                        )
+                        Text(
+                            e.score.toString() + "/" + e.total,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Black,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(10.dp))
     }
 }
