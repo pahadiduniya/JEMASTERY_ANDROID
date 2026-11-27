@@ -51,7 +51,17 @@ data class HistoryItem(
     val total: Int,
     val accuracy: Int,
     val timeTaken: String,
-    val date: Long
+    val date: Long,
+    val wrongQs: List<Int> = emptyList(),
+    val markedQs: List<Int> = emptyList()
+)
+
+data class LeaderEntry(
+    val name: String,
+    val score: Int,
+    val total: Int,
+    val timeTakenSec: Int,
+    val isMe: Boolean
 )
 
 data class UserProfile(
