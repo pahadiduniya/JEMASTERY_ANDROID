@@ -13,16 +13,29 @@ android {
     applicationId = "com.jemastery.app"
     minSdk = 24
     targetSdk = 34
-    versionCode = 1
-    versionName = "1.0.0"
+    versionCode = 2
+    versionName = "2.0.1"
     buildConfigField("String", "WEB_CLIENT_ID", "\"12053815921-v4jqri32h260pcvio1r6uote59cbnvm4.apps.googleusercontent.com\"")
     buildConfigField("String", "PROJECT_ID", "\"je-mastery-360\"")
   }
 
+  signingConfigs {
+    create("jemastery") {
+      storeFile = file("debug.keystore")
+      storePassword = "jemastery123"
+      keyAlias = "jemastery"
+      keyPassword = "jemastery123"
+    }
+  }
+
   buildTypes {
-    release {
+    getByName("debug") {
+      signingConfig = signingConfigs.getByName("jemastery")
+    }
+    getByName("release") {
       isMinifyEnabled = false
       proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+      signingConfig = signingConfigs.getByName("jemastery")
     }
   }
 
