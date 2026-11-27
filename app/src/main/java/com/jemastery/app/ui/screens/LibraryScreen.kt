@@ -77,6 +77,7 @@ fun LibraryScreen(
     var modeQuiz by remember { mutableStateOf<Quiz?>(null) }
     var pendingSections by remember { mutableStateOf<List<Int>>(emptyList()) }
     var showPayment by remember { mutableStateOf(false) }
+    var leaderQuiz by remember { mutableStateOf<Quiz?>(null) }
 
     LaunchedEffect(Unit) {
         try {
@@ -95,15 +96,19 @@ fun LibraryScreen(
     val current = path.last()
     val q = query.trim().lowercase()
 
-    val subFolders = Repo.folders
-        .filter { it.parentId == current.id }
-        .filter { q.isEmpty() || it.name.lowercase().contains(q) }
-        .sortedBy { it.name.lowercase() }
+    val subFolders = if (q.isNotEmpty()) {
+        Repo.folders.filter { it.name.lowercase().contains(q) }.sortedBy { it.name.lowercase() }
+    } else {
+        Repo.folders.filter { it.parentId == current.id }.sortedBy { it.name.lowercase() }
+    }
 
-    val subQuizzes = Repo.quizzes
-        .filter { it.folderId == current.id }
-        .filter { q.isEmpty() || it.title.lowercase().contains(q) }
-        .sortedWith(compareBy({ it.sequence }, { it.title.lowercase() }))
+    val subQuizzes = if (q.isNotEmpty()) {
+        Repo.quizzes.filter { it.title.lowercase().contains(q) }
+            .sortedWith(compareBy({ it.sequence }, { it.title.lowercase() }))
+    } else {
+        Repo.quizzes.filter { it.folderId == current.id }
+            .sortedWith(compareBy({ it.sequence }, { it.title.lowercase() }))
+    }
 
     fun openQuiz(quiz: Quiz) {
         val access = Access.of(quiz.accessType, false)
@@ -355,7 +360,8 @@ fun LibraryScreen(
                             access = access,
                             locked = locked,
                             onClick = { openQuiz(quiz) },
-                            onLocked = { lockedQuiz = quiz }
+                            onLocked = { lockedQuiz = quiz },
+                            onLeaderboard = { leaderQuiz = quiz }
                         )
                         Spacer(Modifier.height(12.dp))
                     }
@@ -419,6 +425,11 @@ fun LibraryScreen(
                 startSelected(mq, pendingSections, practice)
             }
         )
+    }
+
+    val lb = leaderQuiz
+    if (lb != null) {
+        LeaderboardSheet(quiz = lb, onDismiss = { leaderQuiz = null })
     }
 
     val lq = lockedQuiz
@@ -513,7 +524,8 @@ private fun QuizCard(
     access: Access,
     locked: Boolean,
     onClick: () -> Unit,
-    onLocked: () -> Unit
+    onLocked: () -> Unit,
+    onLeaderboard: () -> Unit
 ) {
     val chipColor = when (access) {
         Access.FREE -> Color(0xFF10B981)
@@ -609,7 +621,12 @@ private fun QuizCard(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
-                Text("\uD83C\uDFC6 Leaderboard", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    "\uD83C\uDFC6 Leaderboard",
+                    fontSize = 11.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.clickable { onLeaderboard() }
+                )
                 Text("\uD83D\uDCCA Attempts", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text("\uD83D\uDD17 Share", fontSize = 11.sp, color = MaterialTheme.colorScheme.secondary)
             }
