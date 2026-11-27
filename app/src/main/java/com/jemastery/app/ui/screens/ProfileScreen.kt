@@ -20,6 +20,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -51,6 +53,7 @@ fun ProfileScreen(onBack: () -> Unit, onSignedOut: () -> Unit) {
     var profile by remember { mutableStateOf(Repo.profile) }
     var history by remember { mutableStateOf<List<HistoryItem>>(emptyList()) }
     var loading by remember { mutableStateOf(true) }
+    var dashType by remember { mutableStateOf<String?>(null) }
 
     BackHandler { onBack() }
 
@@ -175,9 +178,9 @@ fun ProfileScreen(onBack: () -> Unit, onSignedOut: () -> Unit) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Spacer(Modifier.height(10.dp))
-            DashRow("\uD83D\uDCDD", "My Attempted Quizzes", history.size.toString())
-            DashRow("\u274C", "My Wrong Attempts", history.sumOf { it.wrong }.toString())
-            DashRow("\uD83D\uDEA9", "My Marked Questions", "-")
+            DashRow("\uD83D\uDCDD", "My Attempted Quizzes", history.size.toString()) { dashType = "attempts" }
+            DashRow("\u274C", "My Wrong Attempts", history.sumOf { it.wrongQs.size }.toString()) { dashType = "wrong" }
+            DashRow("\uD83D\uDEA9", "My Marked Questions", history.sumOf { it.markedQs.size }.toString()) { dashType = "marked" }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -248,13 +251,65 @@ fun ProfileScreen(onBack: () -> Unit, onSignedOut: () -> Unit) {
 
         Spacer(Modifier.height(24.dp))
     }
+
+    val dt = dashType
+    if (dt != null) {
+        val title = when (dt) {
+            "attempts" -> "\uD83D\uDCDD Attempted Quizzes"
+            "wrong" -> "\u274C Wrong Attempts"
+            else -> "\uD83D\uDEA9 Marked Questions"
+        }
+        AlertDialog(
+            onDismissRequest = { dashType = null },
+            title = { Text(title, fontSize = 16.sp) },
+            text = {
+                Column(modifier = Modifier.height(300.dp).verticalScroll(rememberScrollState())) {
+                    if (history.isEmpty()) {
+                        Text("No attempts yet.", fontSize = 12.sp)
+                    }
+                    history.forEach { h ->
+                        val n = when (dt) {
+                            "attempts" -> h.total
+                            "wrong" -> h.wrongQs.size
+                            else -> h.markedQs.size
+                        }
+                        if (dt == "attempts" || n > 0) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    h.quizTitle,
+                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 2
+                                )
+                                Text(
+                                    n.toString(),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Black,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { dashType = null }) { Text("Close") }
+            }
+        )
+    }
 }
 
 @Composable
-private fun DashRow(icon: String, label: String, value: String) {
+private fun DashRow(icon: String, label: String, value: String, onClick: () -> Unit = {}) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
+            .clickable { onClick() }
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
