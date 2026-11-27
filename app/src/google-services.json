@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "12053815921",
+    "project_id": "je-mastery-360",
+    "storage_bucket": "je-mastery-360.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:12053815921:android:b9d895806a58b2b7ba31d0",
+        "android_client_info": {
+          "package_name": "com.jemastery.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "12053815921-0bi1ubrr3d5ocba1rp2vhcg438j6uct6.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.jemastery.app",
+            "certificate_hash": "9e343f07e4dbc3dd67919f25f439790ee255ee39"
+          }
+        },
+        {
+          "client_id": "12053815921-v4jqri32h260pcvio1r6uote59cbnvm4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCiayu3a5AHazguZ0wKa5jk_N0c3ie4ZqI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "12053815921-v4jqri32h260pcvio1r6uote59cbnvm4.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
