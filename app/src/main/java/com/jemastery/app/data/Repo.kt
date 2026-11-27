@@ -71,6 +71,37 @@ object Repo {
             }
         }
 
+    private suspend fun callRaw(method: String, path: String, body: JSONObject? = null): String? =
+        withContext(Dispatchers.IO) {
+            val token = idToken() ?: return@withContext null
+            var conn: HttpURLConnection? = null
+            try {
+                conn = URL(base + "/" + path).openConnection() as HttpURLConnection
+                conn.requestMethod = method
+                conn.connectTimeout = 15000
+                conn.readTimeout = 25000
+                conn.setRequestProperty("Authorization", "Bearer " + token)
+                conn.setRequestProperty("Content-Type", "application/json")
+                if (body != null) {
+                    conn.doOutput = true
+                    conn.outputStream.use { it.write(body.toString().toByteArray()) }
+                }
+                val code = conn.responseCode
+                if (code < 200 || code > 299) return@withContext null
+                conn.inputStream.bufferedReader().use { it.readText() }
+            } catch (e: Exception) {
+                null
+            } finally {
+                conn?.disconnect()
+            }
+        }
+
+    private fun intArray(list: List<Int>): JSONObject {
+        val arr = org.json.JSONArray()
+        list.forEach { arr.put(JSONObject().put("integerValue", it.toString())) }
+        return JSONObject().put("arrayValue", JSONObject().put("values", arr))
+    }
+
     private fun fields(doc: JSONObject): JSONObject = doc.optJSONObject("fields") ?: JSONObject()
 
     private fun docId(doc: JSONObject): String = doc.optString("name").substringAfterLast('/')
@@ -228,6 +259,8 @@ object Repo {
         f.put("timeTaken", JSONObject().put("stringValue", item.timeTaken))
         f.put("mode", JSONObject().put("stringValue", "exam"))
         f.put("date", JSONObject().put("integerValue", item.date.toString()))
+        f.put("wrongQs", intArray(item.wrongQs))
+        f.put("markedQs", intArray(item.markedQs))
         call("POST", "users/" + u.uid + "/history", JSONObject().put("fields", f))
     }
 
@@ -245,9 +278,46 @@ object Repo {
                 total = (num(f, "total") ?: 0L).toInt(),
                 accuracy = (num(f, "accuracy") ?: 0L).toInt(),
                 timeTaken = str(f, "timeTaken") ?: "",
-                date = num(f, "date") ?: 0L
+                date = num(f, "date") ?: 0L,
+                wrongQs = arrayValues(f, "wrongQs").mapNotNull { it.optString("integerValue").toIntOrNull() },
+                markedQs = arrayValues(f, "markedQs").mapNotNull { it.optString("integerValue").toIntOrNull() }
             )
         }.sortedByDescending { it.date }
+    }
+
+    suspend fun loadLeaderboard(quizId: String): List<LeaderEntry> {
+        val sq = JSONObject()
+            .put("from", org.json.JSONArray().put(JSONObject().put("collectionId", "leaderboard")))
+            .put(
+                "where",
+                JSONObject().put(
+                    "fieldFilter",
+                    JSONObject()
+                        .put("field", JSONObject().put("fieldPath", "quizId"))
+                        .put("op", "EQUAL")
+                        .put("value", JSONObject().put("stringValue", quizId))
+                )
+            )
+            .put("limit", 30)
+        val body = JSONObject().put("structuredQuery", sq)
+        val raw = callRaw("POST", ":runQuery", body) ?: return emptyList()
+        val arr = runCatching { org.json.JSONArray(raw) }.getOrNull() ?: return emptyList()
+        val myName = profile.username.ifBlank { profile.name }
+        val out = ArrayList<LeaderEntry>()
+        for (i in 0 until arr.length()) {
+            val doc = arr.optJSONObject(i)?.optJSONObject("document") ?: continue
+            val f = fields(doc)
+            out.add(
+                LeaderEntry(
+                    name = str(f, "name") ?: "student",
+                    score = (num(f, "score") ?: 0L).toInt(),
+                    total = (num(f, "total") ?: 0L).toInt(),
+                    timeTakenSec = (num(f, "timeTakenSec") ?: 0L).toInt(),
+                    isMe = (str(f, "name") ?: "") == myName
+                )
+            )
+        }
+        return out.sortedWith(compareByDescending<LeaderEntry> { it.score }.thenBy { it.timeTakenSec })
     }
 
     fun signOut() {
