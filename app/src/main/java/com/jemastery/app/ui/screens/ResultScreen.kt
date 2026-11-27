@@ -1,6 +1,7 @@
 package com.jemastery.app.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,8 +38,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.jemastery.app.data.Lang
 import com.jemastery.app.data.QuizParser
 import com.jemastery.app.data.Repo
+
+private val Green = Color(0xFF10B981)
+private val Red = Color(0xFFEF4444)
 
 @Composable
 fun ResultScreen(onHome: () -> Unit, onProfile: () -> Unit) {
@@ -114,8 +119,8 @@ fun ResultScreen(onHome: () -> Unit, onProfile: () -> Unit) {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(9.dp)
         ) {
-            StatCard("\u2705", r.correct.toString(), "Correct", Color(0xFF10B981), Modifier.weight(1f))
-            StatCard("\u274C", r.wrong.toString(), "Wrong", Color(0xFFEF4444), Modifier.weight(1f))
+            StatCard("\u2705", r.correct.toString(), "Correct", Green, Modifier.weight(1f))
+            StatCard("\u274C", r.wrong.toString(), "Wrong", Red, Modifier.weight(1f))
             StatCard("\u2014", r.skipped.toString(), "Skipped", MaterialTheme.colorScheme.onSurfaceVariant, Modifier.weight(1f))
             StatCard("\u23F1", r.timeTaken, "Time", Color(0xFFF59E0B), Modifier.weight(1f))
         }
@@ -164,12 +169,12 @@ fun ResultScreen(onHome: () -> Unit, onProfile: () -> Unit) {
             }
             if (!passes) return@forEachIndexed
 
-            val (qText, qHi) = QuizParser.lang(q.text, com.jemastery.app.data.Lang.ENGLISH)
+            val (qText, qHi) = QuizParser.lang(q.text, Lang.ENGLISH)
 
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 10.dp)
+                    .padding(bottom = 12.dp)
                     .clip(RoundedCornerShape(14.dp))
                     .background(MaterialTheme.colorScheme.surface)
                     .padding(12.dp)
@@ -182,12 +187,26 @@ fun ResultScreen(onHome: () -> Unit, onProfile: () -> Unit) {
                         color = MaterialTheme.colorScheme.primary
                     )
                     Spacer(Modifier.weight(1f))
+                    val tag = q.pyqTag
+                    if (tag != null) {
+                        Text(
+                            tag.uppercase(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Red,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(Color(0xFFFEF2F2))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        )
+                        Spacer(Modifier.size(6.dp))
+                    }
                     if (given == null) {
                         Text("\u2014 Skipped", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     } else if (isCorrect) {
-                        Text("\u2705 Correct", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF10B981))
+                        Text("\u2705 Correct", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Green)
                     } else {
-                        Text("\u274C Wrong", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFFEF4444))
+                        Text("\u274C Wrong", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Red)
                     }
                 }
                 Spacer(Modifier.height(6.dp))
@@ -195,55 +214,102 @@ fun ResultScreen(onHome: () -> Unit, onProfile: () -> Unit) {
                 if (qHi != null) {
                     Text(qHi, fontSize = 11.sp, color = Color(0xFF0D9488))
                 }
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Your answer: " + (given?.let { q.options.getOrNull(it) ?: "-" } ?: "Not attempted"),
-                    fontSize = 11.sp,
-                    color = if (isCorrect) Color(0xFF10B981) else Color(0xFFEF4444)
-                )
-                if (!isCorrect && q.correct >= 0) {
-                    Text(
-                        "Correct: " + (q.options.getOrNull(q.correct) ?: "-"),
-                        fontSize = 11.sp,
-                        color = Color(0xFF10B981)
-                    )
+
+                Spacer(Modifier.height(8.dp))
+
+                q.options.forEachIndexed { oi, opt ->
+                    val isRight = oi == q.correct
+                    val isMine = given == oi
+                    val bg = when {
+                        isRight -> Green.copy(alpha = 0.13f)
+                        isMine && !isRight -> Red.copy(alpha = 0.13f)
+                        else -> Color.Transparent
+                    }
+                    val borderC = when {
+                        isRight -> Green
+                        isMine && !isRight -> Red
+                        else -> MaterialTheme.colorScheme.surfaceVariant
+                    }
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 6.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(bg)
+                            .border(1.dp, borderC, RoundedCornerShape(10.dp))
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            ('A' + oi).toString(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Black,
+                            color = when {
+                                isRight -> Green
+                                isMine && !isRight -> Red
+                                else -> MaterialTheme.colorScheme.onSurfaceVariant
+                            }
+                        )
+                        Spacer(Modifier.size(8.dp))
+                        Text(
+                            opt,
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (isRight) Text("\u2713", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Green)
+                        else if (isMine) Text("\u2715", fontSize = 12.sp, fontWeight = FontWeight.Black, color = Red)
+                    }
                 }
+
                 if (q.explanation.isNotBlank()) {
                     Spacer(Modifier.height(4.dp))
-                    Text(
-                        "Ex: " + q.explanation,
-                        fontSize = 10.sp,
-                        lineHeight = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "\uD83E\uDD16 AI Solution",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF7C3AED),
+                    Column(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .background(Color(0xFFF5F3FF))
-                            .clickable {
-                                val prompt = buildAiPrompt(q)
-                                copyToClipboard(context, prompt)
-                                runCatching {
-                                    context.startActivity(
-                                        Intent(
-                                            Intent.ACTION_VIEW,
-                                            android.net.Uri.parse(
-                                                "https://www.perplexity.ai/search?q=" + android.net.Uri.encode(prompt)
-                                            )
-                                        )
-                                    )
-                                }
-                            }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+                            .padding(10.dp)
+                    ) {
+                        Text(
+                            "\uD83D\uDCA1 Explanation",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(3.dp))
+                        Text(
+                            q.explanation,
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
+
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "\uD83E\uDD16 AI Solution",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF7C3AED),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(Color(0xFFF5F3FF))
+                        .clickable {
+                            val prompt = buildAiPrompt(q)
+                            copyToClipboard(context, prompt)
+                            runCatching {
+                                context.startActivity(
+                                    Intent(
+                                        Intent.ACTION_VIEW,
+                                        Uri.parse("https://www.perplexity.ai/search?q=" + Uri.encode(prompt))
+                                    )
+                                )
+                            }
+                        }
+                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                )
             }
         }
 
