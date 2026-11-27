@@ -6,6 +6,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -45,7 +48,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -59,6 +64,9 @@ import com.jemastery.app.ui.components.ProgressBar
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+private val Green = Color(0xFF10B981)
+private val Red = Color(0xFFEF4444)
+
 @Composable
 fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
 
@@ -67,6 +75,7 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
     val mode = Repo.activeMode
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
+    val haptic = LocalHapticFeedback.current
     val practice = mode == QuizMode.PRACTICE
 
     if (quiz == null || questions.isEmpty()) {
@@ -92,6 +101,7 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
     var fontScale by remember { mutableStateOf(1.0f) }
     var autoOn by remember { mutableStateOf(true) }
     var langMenu by remember { mutableStateOf(false) }
+    var revealed by remember { mutableStateOf(false) }
 
     fun finish() {
         if (finished) return
@@ -105,6 +115,9 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
         val accuracy = if (total == 0) 0 else (correct * 100) / total
         val used = quiz.timeMinutes * 60 - secondsLeft
         val timeStr = (used / 60).toString() + "m " + (used % 60).toString() + "s"
+        val wrongQs = questions.indices.filter { answers[it] != null && answers[it] != questions[it].correct }
+        val markedQs = marked.toList().sorted()
+
         val item = HistoryItem(
             quizId = quiz.id,
             quizTitle = quiz.title,
@@ -114,7 +127,9 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
             total = total,
             accuracy = accuracy,
             timeTaken = timeStr,
-            date = System.currentTimeMillis()
+            date = System.currentTimeMillis(),
+            wrongQs = wrongQs,
+            markedQs = markedQs
         )
         Repo.lastResult = item
         Repo.lastAnswers = answers
@@ -124,7 +139,6 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
 
     val finishRef by rememberUpdatedState { finish() }
 
-    // timer only in exam mode
     LaunchedEffect(mode) {
         if (practice) return@LaunchedEffect
         while (secondsLeft > 0) {
@@ -134,11 +148,11 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
         finishRef()
     }
 
-    // practice mode auto next
-    LaunchedEffect(index, answers[index], autoOn) {
-        if (!practice || !autoOn) return@LaunchedEffect
-        if (answers[index] == null) return@LaunchedEffect
-        delay(1100L)
+    LaunchedEffect(index) { revealed = false }
+
+    LaunchedEffect(index, revealed, autoOn) {
+        if (!practice || !autoOn || !revealed) return@LaunchedEffect
+        delay(2400L)
         if (index < questions.size - 1) index += 1
     }
 
@@ -151,10 +165,10 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
     val minutes = secondsLeft / 60
     val seconds = secondsLeft % 60
     val timeText = (if (minutes < 10) "0" else "") + minutes + ":" + (if (seconds < 10) "0" else "") + seconds
+    val picked = answers[index]
 
     Column(modifier = Modifier.fillMaxSize()) {
 
-        // header
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -171,10 +185,10 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    if (practice) "PRACTICE MODE (\uD83D\uDD00 Shuffled)" else "EXAM MODE",
+                    if (practice) "PRACTICE MODE \u00B7 instant answer" else "EXAM MODE",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (practice) Color(0xFF10B981) else Color(0xFFEF4444)
+                    color = if (practice) Green else Red
                 )
             }
             if (!practice) {
@@ -269,8 +283,7 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                         .clip(RoundedCornerShape(8.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable {
-                            val prompt = buildAiPrompt(q)
-                            copyToClipboard(context, prompt)
+                            copyToClipboard(context, "Question " + (index + 1) + ": " + qText)
                             runCatching {
                                 context.startActivity(
                                     Intent(Intent.ACTION_VIEW, Uri.parse("https://telegram.me/IS1343"))
@@ -310,7 +323,7 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                     "\u26A0\uFE0F Report",
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFEF4444),
+                    color = Red,
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .background(Color(0xFFFEF2F2))
@@ -333,7 +346,7 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                     tag.uppercase(),
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
-                    color = if (practice) Color(0xFF3B82F6) else Color(0xFFEF4444),
+                    color = if (practice) Color(0xFF3B82F6) else Red,
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
                         .background(if (practice) Color(0xFFEFF6FF) else Color(0xFFFEF2F2))
@@ -362,24 +375,41 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
             Spacer(Modifier.height(16.dp))
 
             q.options.forEachIndexed { i, option ->
-                val selected = answers[index] == i
+                val selected = picked == i
+                val isCorrectOpt = i == q.correct
+                val showResult = practice && revealed
+
+                val bgColor = when {
+                    showResult && isCorrectOpt -> Green.copy(alpha = 0.14f)
+                    showResult && selected && !isCorrectOpt -> Red.copy(alpha = 0.14f)
+                    selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                    else -> MaterialTheme.colorScheme.surface
+                }
+                val borderColor = when {
+                    showResult && isCorrectOpt -> Green
+                    showResult && selected && !isCorrectOpt -> Red
+                    selected -> MaterialTheme.colorScheme.primary
+                    else -> MaterialTheme.colorScheme.surfaceVariant
+                }
+
                 val (optEn, optHi) = QuizParser.lang(option, lang)
+
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 9.dp)
                         .clip(RoundedCornerShape(12.dp))
-                        .background(
-                            if (selected) MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                            else MaterialTheme.colorScheme.surface
-                        )
+                        .background(bgColor)
                         .border(
-                            width = if (selected) 2.dp else 1.dp,
-                            color = if (selected) MaterialTheme.colorScheme.primary
-                            else MaterialTheme.colorScheme.surfaceVariant,
+                            width = if (selected || (showResult && isCorrectOpt)) 2.dp else 1.dp,
+                            color = borderColor,
                             shape = RoundedCornerShape(12.dp)
                         )
-                        .clickable { answers = answers.toMutableMap().apply { put(index, i) } }
+                        .clickable(enabled = !(practice && revealed)) {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            answers = answers.toMutableMap().apply { put(index, i) }
+                            if (practice) revealed = true
+                        }
                         .padding(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -388,16 +418,23 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                             .size(26.dp)
                             .clip(CircleShape)
                             .background(
-                                if (selected) MaterialTheme.colorScheme.primary
-                                else MaterialTheme.colorScheme.surfaceVariant
+                                when {
+                                    showResult && isCorrectOpt -> Green
+                                    showResult && selected && !isCorrectOpt -> Red
+                                    selected -> MaterialTheme.colorScheme.primary
+                                    else -> MaterialTheme.colorScheme.surfaceVariant
+                                }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            ('A' + i).toString(),
+                            if (showResult && isCorrectOpt) "\u2713"
+                            else if (showResult && selected && !isCorrectOpt) "\u2715"
+                            else ('A' + i).toString(),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (selected || (showResult && isCorrectOpt)) Color.White
+                            else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                     Column(modifier = Modifier.padding(start = 12.dp)) {
@@ -417,6 +454,65 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
                 }
             }
 
+            if (practice) {
+                AnimatedVisibility(
+                    visible = revealed,
+                    enter = fadeIn() + expandVertically()
+                ) {
+                    Column {
+                        val gotIt = picked != null && picked == q.correct
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (gotIt) Green.copy(alpha = 0.14f) else Red.copy(alpha = 0.14f))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                if (gotIt) "\u2705 Correct!" else "\u274C Wrong",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (gotIt) Color(0xFF047857) else Color(0xFFB91C1C)
+                            )
+                            Spacer(Modifier.weight(1f))
+                            if (!gotIt && q.correct >= 0) {
+                                Text(
+                                    "Answer: " + ('A' + q.correct),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF047857)
+                                )
+                            }
+                        }
+                        if (q.explanation.isNotBlank()) {
+                            Spacer(Modifier.height(8.dp))
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f))
+                                    .padding(12.dp)
+                            ) {
+                                Text(
+                                    "\uD83D\uDCA1 Explanation",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    q.explanation,
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
             if (!practice) {
                 Spacer(Modifier.height(4.dp))
                 OutlinedButton(
@@ -430,7 +526,6 @@ fun QuizScreen(onExit: () -> Unit, onFinished: () -> Unit) {
             Spacer(Modifier.height(16.dp))
         }
 
-        // bottom bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
