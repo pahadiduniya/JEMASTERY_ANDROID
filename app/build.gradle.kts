@@ -13,8 +13,8 @@ android {
     applicationId = "com.jemastery.app"
     minSdk = 24
     targetSdk = 34
-    versionCode = 2
-    versionName = "2.0.1"
+    versionCode = 3
+    versionName = "2.0.2"
     buildConfigField("String", "WEB_CLIENT_ID", "\"12053815921-v4jqri32h260pcvio1r6uote59cbnvm4.apps.googleusercontent.com\"")
     buildConfigField("String", "PROJECT_ID", "\"je-mastery-360\"")
   }
